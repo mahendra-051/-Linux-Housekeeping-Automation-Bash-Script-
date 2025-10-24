@@ -1,0 +1,60 @@
+#!/bin/bash
+
+# ==============================
+# Linux Housekeeping Automation
+# ==============================
+# Author  : Mahendra Pratap Singh
+# Purpose : Automate housekeeping of datafiles
+# Date    : $(date +"%d-%m-%Y")
+# ==============================
+
+# Path Setup
+TODAYS=$(date +"%d%m%Y")
+LOG_FILE="/home/expresssach/data/housekeepingTODAY.txt"
+
+# Yesterday's date in DDMMYYYY format
+YESTERDAY=$(date -d "yesterday" +"%d%m%Y")
+
+# Archive folder name
+ARCHIVE_DIR="/home/expresssach/data/datafiles_$YESTERDAY"
+
+# Step 1 : Create archive folder and move files from datafiles
+mkdir -p "$ARCHIVE_DIR"
+mv /home/expresssach/data/datafiles/* "$ARCHIVE_DIR"/ 2>/dev/null
+
+# Step 2 : Remove old datafiles directory
+rm -rf /home/expresssach/data/datafiles
+
+# Step 3 : Recreate fresh datafiles directory with 775 permission
+mkdir -m 775 -p /home/expresssach/data/datafiles
+
+# Step 4 : Create backup and TEMP folder with 775 permission inside the datafiles
+mkdir -m 775 -p /home/expresssach/data/datafiles/backup /home/expresssach/data/datafiles/TEMP
+
+# Step 5 : Ensure archive folder also has 775 permission
+chmod 775 "$ARCHIVE_DIR"
+
+# Step 6 : Delete archive folder older than 10 days
+DELETED_DIRS=$(find /home/expresssach/data -maxdepth 1 -type d -name "datafiles_*" -mtime +10)
+find /home/expresssach/data -maxdepth 1 -type d -name "datafiles_*" -mtime +10 -exec rm -rf {} \;
+
+# Step 7 : Log the operation
+{
+    echo "======= Housekeeping Run ======="
+    echo "Date: $(date)"
+    echo "Archived to: $ARCHIVE_DIR"
+    echo "Recreated: /home/expresssach/data/datafiles with backup & TEMP"
+    if [[ -n "$DELETED_DIRS" ]]; then
+        echo "Deleted old archives:"
+        echo "$DELETED_DIRS"
+    else
+        echo "No old archives deleted"
+    fi
+    echo "================================"
+} >> "$LOG_FILE"
+
+# Step 8 : Send email alert with log attachment
+MAIL_TO="mp.singh2464@gmail.com"
+MAIL_SUBJECT="Housekeeping Cleanup completed on $(date +%d-%m-%Y)"
+
+echo "Housekeeping completed. Please find the log attached." | mail -s "$MAIL_SUBJECT" "$MAIL_TO" < "$LOG_FILE"
